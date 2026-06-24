@@ -69,8 +69,6 @@ def draw():
 def key_pressed():
     global current_mode, timer_value, gaming_mode
 
-    assert keyboard is not None
-
     if keyboard.key == "t":
         if current_mode == "normal":
             if timer_value is not None:
@@ -153,8 +151,6 @@ def draw_hands():
 
 def draw_timer():
     global timer_value
-
-    assert mouse is not None
 
     if date.minute == timer_value:
         timer_value = None
