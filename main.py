@@ -8,6 +8,7 @@ from citam_pydraw import (
     Line,
     Mouse,
     Music,
+    Rectangle,
     Text,
     Window,
     animation,
@@ -23,15 +24,20 @@ CENTER = int(WINDOW_SIZE / 2)
 
 HOUR_HAND_LENGTH = CLOCK_RADIUS * 0.4
 HOUR_HAND_THICKNESS = 8
-MINUTE_HAND_LENGTH = CLOCK_RADIUS * 0.6
+MINUTE_HAND_LENGTH = CLOCK_RADIUS * 0.7
 MINUTE_HAND_THICKNESS = 4
 SECOND_HAND_LENGTH = CLOCK_RADIUS * 0.85
 SECOND_HAND_THICKNESS = 2
 
 SCALE_START = (WINDOW_SIZE - CLOCK_SIZE) / 2
 SCALE_END = SCALE_START + (CENTER - SCALE_START) / 25
-FONT_SIZE = int(CLOCK_RADIUS / 7)
+FONT_SIZE = int(WINDOW_SIZE * 0.05)
 DIAL_LOCATION = SCALE_START + (CENTER - SCALE_START) / 6
+
+CLOCK_COLOR = "#FFFFFF"
+SUNRISE_COLOR = "#FB702B"
+NIGHT_COLOR = "#160764"
+NOON_COLOR = "#2BA4FB"
 
 DEFAULT_HOUR_COLOR = "#000000"
 ACTIVE_HOUR_COLOR = "#FB2B37"
@@ -45,9 +51,10 @@ TIMER_BACKGROUND_COLOR_SET = "#CCCCFF"
 def draw():
     key_pressed()
     mouse_pressed()
+    draw_background()
+    draw_dials()
     draw_timer()
     draw_hands()
-    draw_dials()
     draw_scales()
 
 
@@ -76,8 +83,22 @@ def mouse_pressed():
         timer_value = int(30 - atan2(mouse.X - CENTER, mouse.Y - CENTER) / pi * 30)
 
 
+def draw_background():
+    hour = date.hour + date.minute / 60
+    hour = 4.5
+
+    if 4.5 <= hour < 7:
+        Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(SUNRISE_COLOR)
+    elif 7 <= hour < 17:
+        Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(NOON_COLOR)
+    elif 17 <= hour < 20:
+        Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(SUNRISE_COLOR)
+    elif 20 <= hour < 24 or 0 <= hour < 4.5:
+        Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(NIGHT_COLOR)
+
+
 def draw_dials():
-    Ellipse(CENTER, CENTER, CLOCK_SIZE, CLOCK_SIZE).noFill()
+    Ellipse(CENTER, CENTER, CLOCK_SIZE, CLOCK_SIZE).fill(CLOCK_COLOR)
 
     for i in range(0, 12):
         text = "12" if i == 0 else str(i)
@@ -100,11 +121,11 @@ def draw_scales():
 
 def draw_hands():
     # 時針
-    Line(
-        CENTER, CENTER, CENTER, CENTER - HOUR_HAND_LENGTH, HOUR_HAND_THICKNESS
-    ).setRotationCenter(CENTER, CENTER).rotate(
-        (date.hour + date.minute / 60) / 12 * 360
-    )
+    # Line(
+    #    CENTER, CENTER, CENTER, CENTER - HOUR_HAND_LENGTH, HOUR_HAND_THICKNESS
+    # ).setRotationCenter(CENTER, CENTER).rotate(
+    #    (date.hour + date.minute / 60) / 12 * 360
+    # )
     # 分針
     Line(
         CENTER, CENTER, CENTER, CENTER - MINUTE_HAND_LENGTH, MINUTE_HAND_THICKNESS
@@ -138,8 +159,8 @@ def draw_timer():
         Arc(
             CENTER,
             CENTER,
-            CLOCK_SIZE * 0.8,
-            CLOCK_SIZE * 0.8,
+            CLOCK_SIZE * 0.75,
+            CLOCK_SIZE * 0.75,
             90 - current_degree,
             -(target_degree - current_degree + 360),
         ).fill(TIMER_BACKGROUND_COLOR_SETTING).noOutline()
@@ -149,16 +170,16 @@ def draw_timer():
         Arc(
             CENTER,
             CENTER,
-            CLOCK_SIZE * 0.8,
-            CLOCK_SIZE * 0.8,
+            CLOCK_SIZE * 0.75,
+            CLOCK_SIZE * 0.75,
             90 - current_degree,
             -(target_degree - current_degree + 360),
         ).fill(TIMER_BACKGROUND_COLOR_SET).noOutline()
 
         Text(
             f"{(timer_value - date.minute + 60) % 60}分",
-            cos((target_degree - 90) / 180 * pi) * CLOCK_RADIUS * 0.7 + CENTER,
-            sin((target_degree - 90) / 180 * pi) * CLOCK_RADIUS * 0.7 + CENTER,
+            cos((target_degree - 90) / 180 * pi) * CLOCK_RADIUS * 0.65 + CENTER,
+            sin((target_degree - 90) / 180 * pi) * CLOCK_RADIUS * 0.65 + CENTER,
         ).font("", 24).fill(TIMER_COLOR)
 
 
@@ -166,7 +187,7 @@ if __name__ == "__main__":
     window = (
         Window(WINDOW_SIZE, WINDOW_SIZE)
         .title("デジタルアナログ時計")
-        .background("#fff")
+        .background(CLOCK_COLOR)
     )
 
     date = Date()
