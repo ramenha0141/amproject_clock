@@ -1,4 +1,20 @@
-from citam_pydraw import Date, Ellipse, Line, Text, Window, animation
+# type: ignore
+
+from citam_pydraw import (
+    Arc,
+    Date,
+    Ellipse,
+    KeyBoard,
+    Line,
+    Mouse,
+    Music,
+    Text,
+    Window,
+    animation,
+    keyPressed,
+    mousePressed,
+)
+from math import atan2, pi, sin, cos
 
 CLOCK_RADIUS = 300
 CLOCK_SIZE = CLOCK_RADIUS * 2
@@ -20,12 +36,44 @@ DIAL_LOCATION = SCALE_START + (CENTER - SCALE_START) / 6
 DEFAULT_HOUR_COLOR = "#000000"
 ACTIVE_HOUR_COLOR = "#FB2B37"
 
+TIMER_COLOR = "#FF0000"
+TIMER_BACKGROUND_COLOR_SETTING = "#FFCCCC"
+TIMER_BACKGROUND_COLOR_SET = "#CCCCFF"
+
 
 @animation(True)
 def draw():
+    key_pressed()
+    mouse_pressed()
+    draw_timer()
     draw_hands()
     draw_dials()
     draw_scales()
+
+
+@keyPressed
+def key_pressed():
+    global current_mode, timer_value
+
+    assert keyboard is not None
+
+    if keyboard.key == "t":
+        if current_mode == "normal":
+            if timer_value is not None:
+                timer_value = None
+            else:
+                current_mode = "set_timer"
+        elif current_mode == "set_timer":
+            current_mode = "normal"
+
+
+@mousePressed
+def mouse_pressed():
+    global current_mode, timer_value
+
+    if mouse.pressButton == "left" and current_mode == "set_timer":
+        current_mode = "normal"
+        timer_value = int(30 - atan2(mouse.X - CENTER, mouse.Y - CENTER) / pi * 30)
 
 
 def draw_dials():
@@ -55,20 +103,63 @@ def draw_hands():
     Line(
         CENTER, CENTER, CENTER, CENTER - HOUR_HAND_LENGTH, HOUR_HAND_THICKNESS
     ).setRotationCenter(CENTER, CENTER).rotate(
-        (date.hour + date.minute / 60) / 12 * 360  # pyright: ignore
+        (date.hour + date.minute / 60) / 12 * 360
     )
     # 分針
     Line(
         CENTER, CENTER, CENTER, CENTER - MINUTE_HAND_LENGTH, MINUTE_HAND_THICKNESS
     ).setRotationCenter(CENTER, CENTER).rotate(
-        (date.minute + date.second / 60) / 60 * 360  # pyright: ignore
+        (date.minute + date.second / 60) / 60 * 360
     )
     # 秒針
     Line(
         CENTER, CENTER, CENTER, CENTER - SECOND_HAND_LENGTH, SECOND_HAND_THICKNESS
     ).setRotationCenter(CENTER, CENTER).rotate(
-        (date.second + date.milli_second / 1000) / 60 * 360  # pyright: ignore
+        (date.second + date.milli_second / 1000) / 60 * 360
     ).fill("#f00")
+
+
+def draw_timer():
+    global timer_value
+
+    assert mouse is not None
+
+    if date.minute == timer_value:
+        timer_value = None
+        timer_sound.play()
+
+    current_degree = int((date.minute + date.second / 60) / 60 * 360)
+
+    if current_mode == "set_timer":
+        target_degree = int(
+            int(30 - atan2(mouse.X - CENTER, mouse.Y - CENTER) / pi * 30) / 60 * 360
+        )
+
+        Arc(
+            CENTER,
+            CENTER,
+            CLOCK_SIZE * 0.8,
+            CLOCK_SIZE * 0.8,
+            90 - current_degree,
+            -(target_degree - current_degree + 360),
+        ).fill(TIMER_BACKGROUND_COLOR_SETTING).noOutline()
+    elif timer_value is not None:
+        target_degree = int(timer_value / 60 * 360)
+
+        Arc(
+            CENTER,
+            CENTER,
+            CLOCK_SIZE * 0.8,
+            CLOCK_SIZE * 0.8,
+            90 - current_degree,
+            -(target_degree - current_degree + 360),
+        ).fill(TIMER_BACKGROUND_COLOR_SET).noOutline()
+
+        Text(
+            f"{(timer_value - date.minute + 60) % 60}分",
+            cos((target_degree - 90) / 180 * pi) * CLOCK_RADIUS * 0.7 + CENTER,
+            sin((target_degree - 90) / 180 * pi) * CLOCK_RADIUS * 0.7 + CENTER,
+        ).font("", 24).fill(TIMER_COLOR)
 
 
 if __name__ == "__main__":
@@ -79,6 +170,13 @@ if __name__ == "__main__":
     )
 
     date = Date()
+    keyboard = KeyBoard()
+    mouse = Mouse()
+
+    current_mode = "normal"
+    timer_value = None
+
+    timer_sound = Music("./timer.mp3")
 
     draw()
     window.show()
