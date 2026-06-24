@@ -38,9 +38,21 @@ FONT_SIZE = int(WINDOW_SIZE * 0.05)
 DIAL_LOCATION = SCALE_START + (CENTER - SCALE_START) / 6
 
 CLOCK_COLOR = "#FFFFFF"
-SUNRISE_COLOR = "#FB702B"
-NIGHT_COLOR = "#160764"
-NOON_COLOR = "#2BA4FB"
+
+# 時刻(時)ごとの空の色 (Minecraftの昼夜サイクルを参考)。
+# 末尾の 24.0 は先頭 0.0 と同色にしてループを滑らかにつなぐ。
+SKY_KEYFRAMES = [
+    (0.0, "#0A1133"),  # 深夜: 濃い藍色の夜空
+    (5.0, "#27305C"),  # 夜明け前: 空が白み始める
+    (6.5, "#FF7B3D"),  # 日の出: オレンジの朝焼け
+    (8.0, "#7FB0FF"),  # 朝
+    (12.0, "#78A7FF"),  # 正午: Minecraftの昼空の青
+    (16.0, "#78A7FF"),  # 午後
+    (18.0, "#FB6A2B"),  # 日の入り: 夕焼けのオレンジ
+    (19.5, "#3A2A5C"),  # 薄暮: 紫がかった空
+    (21.0, "#0F1840"),  # 夜
+    (24.0, "#0A1133"),  # 深夜 (0:00へループ)
+]
 
 DEFAULT_HOUR_COLOR = "#000000"
 ACTIVE_HOUR_COLOR = "#FB2B37"
@@ -90,20 +102,30 @@ def mouse_pressed():
         timer_value = int(30 - atan2(mouse.X - CENTER, mouse.Y - CENTER) / pi * 30)
 
 
+def lerp_color(c1, c2, t):
+    r1, g1, b1 = int(c1[1:3], 16), int(c1[3:5], 16), int(c1[5:7], 16)
+    r2, g2, b2 = int(c2[1:3], 16), int(c2[3:5], 16), int(c2[5:7], 16)
+    r = int(r1 + (r2 - r1) * t)
+    g = int(g1 + (g2 - g1) * t)
+    b = int(b1 + (b2 - b1) * t)
+    return "#" + format(r, "02x") + format(g, "02x") + format(b, "02x")
+
+
+def sky_color(hour):
+    for i in range(len(SKY_KEYFRAMES) - 1):
+        t0, c0 = SKY_KEYFRAMES[i]
+        t1, c1 = SKY_KEYFRAMES[i + 1]
+        if t0 <= hour < t1:
+            return lerp_color(c0, c1, (hour - t0) / (t1 - t0))
+    return SKY_KEYFRAMES[-1][1]
+
+
 def draw_background():
     if gaming_mode:
         Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(color(count, 100, 100))
     else:
-        hour = date.hour + date.minute / 60
-
-        if 4.5 <= hour < 7:
-            Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(SUNRISE_COLOR)
-        elif 7 <= hour < 17:
-            Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(NOON_COLOR)
-        elif 17 <= hour < 20:
-            Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(SUNRISE_COLOR)
-        elif 20 <= hour < 24 or 0 <= hour < 4.5:
-            Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(NIGHT_COLOR)
+        hour = date.hour + date.minute / 60 + date.second / 3600
+        Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(sky_color(hour))
 
 
 def draw_dials():
