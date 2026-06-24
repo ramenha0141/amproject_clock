@@ -85,7 +85,6 @@ def mouse_pressed():
 
 def draw_background():
     hour = date.hour + date.minute / 60
-    hour = 4.5
 
     if 4.5 <= hour < 7:
         Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(SUNRISE_COLOR)
