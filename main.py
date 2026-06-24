@@ -12,6 +12,9 @@ from citam_pydraw import (
     Text,
     Window,
     animation,
+    animationSpeed,
+    color,
+    colorMode,
     keyPressed,
     mousePressed,
 )
@@ -49,6 +52,10 @@ TIMER_BACKGROUND_COLOR_SET = "#CCCCFF"
 
 @animation(True)
 def draw():
+    global count
+
+    count = (count + 1) % 100
+
     key_pressed()
     mouse_pressed()
     draw_background()
@@ -60,7 +67,7 @@ def draw():
 
 @keyPressed
 def key_pressed():
-    global current_mode, timer_value
+    global current_mode, timer_value, gaming_mode
 
     assert keyboard is not None
 
@@ -72,6 +79,8 @@ def key_pressed():
                 current_mode = "set_timer"
         elif current_mode == "set_timer":
             current_mode = "normal"
+    elif keyboard.key == "g":
+        gaming_mode = not gaming_mode
 
 
 @mousePressed
@@ -84,16 +93,19 @@ def mouse_pressed():
 
 
 def draw_background():
-    hour = date.hour + date.minute / 60
+    if gaming_mode:
+        Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(color(count, 100, 100))
+    else:
+        hour = date.hour + date.minute / 60
 
-    if 4.5 <= hour < 7:
-        Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(SUNRISE_COLOR)
-    elif 7 <= hour < 17:
-        Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(NOON_COLOR)
-    elif 17 <= hour < 20:
-        Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(SUNRISE_COLOR)
-    elif 20 <= hour < 24 or 0 <= hour < 4.5:
-        Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(NIGHT_COLOR)
+        if 4.5 <= hour < 7:
+            Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(SUNRISE_COLOR)
+        elif 7 <= hour < 17:
+            Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(NOON_COLOR)
+        elif 17 <= hour < 20:
+            Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(SUNRISE_COLOR)
+        elif 20 <= hour < 24 or 0 <= hour < 4.5:
+            Rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE).fill(NIGHT_COLOR)
 
 
 def draw_dials():
@@ -188,15 +200,18 @@ if __name__ == "__main__":
         .title("デジタルアナログ時計")
         .background(CLOCK_COLOR)
     )
+    animationSpeed(100)
+    colorMode("HSV")
 
     date = Date()
     keyboard = KeyBoard()
     mouse = Mouse()
+    timer_sound = Music("./timer.mp3")
 
     current_mode = "normal"
     timer_value = None
-
-    timer_sound = Music("./timer.mp3")
+    gaming_mode = False
+    count = 0
 
     draw()
     window.show()
