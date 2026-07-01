@@ -62,6 +62,10 @@ TIMER_BACKGROUND_COLOR_SETTING = "#FFCCCC"
 TIMER_BACKGROUND_COLOR_SET = "#CCCCFF"
 
 
+def mouse_pos_to_minute():
+    return int(30 - atan2(mouse.X - CENTER, mouse.Y - CENTER) / pi * 30 + 0.5)
+
+
 @animation(True)
 def draw():
     global count
@@ -99,7 +103,7 @@ def mouse_pressed():
 
     if mouse.pressButton == "left" and current_mode == "set_timer":
         current_mode = "normal"
-        timer_value = int(30 - atan2(mouse.X - CENTER, mouse.Y - CENTER) / pi * 30)
+        timer_value = mouse_pos_to_minute()
 
 
 def lerp_color(c1, c2, t):
@@ -151,12 +155,6 @@ def draw_scales():
 
 
 def draw_hands():
-    # 時針
-    # Line(
-    #    CENTER, CENTER, CENTER, CENTER - HOUR_HAND_LENGTH, HOUR_HAND_THICKNESS
-    # ).setRotationCenter(CENTER, CENTER).rotate(
-    #    (date.hour + date.minute / 60) / 12 * 360
-    # )
     # 分針
     Line(
         CENTER, CENTER, CENTER, CENTER - MINUTE_HAND_LENGTH, MINUTE_HAND_THICKNESS
@@ -181,10 +179,7 @@ def draw_timer():
     current_degree = int((date.minute + date.second / 60) / 60 * 360)
 
     if current_mode == "set_timer":
-        target_degree = int(
-            int(30 - atan2(mouse.X - CENTER, mouse.Y - CENTER) / pi * 30) / 60 * 360
-        )
-
+        target_degree = mouse_pos_to_minute() * 6
         Arc(
             CENTER,
             CENTER,
