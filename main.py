@@ -179,7 +179,9 @@ def draw_timer():
     current_degree = int((date.minute + date.second / 60) / 60 * 360)
 
     if current_mode == "set_timer":
-        target_degree = mouse_pos_to_minute() * 6
+        target_minute = mouse_pos_to_minute()
+        target_degree = target_minute * 6
+
         Arc(
             CENTER,
             CENTER,
@@ -188,6 +190,12 @@ def draw_timer():
             90 - current_degree,
             -(target_degree - current_degree + 360),
         ).fill(TIMER_BACKGROUND_COLOR_SETTING).noOutline()
+
+        Text(
+            f"{(target_minute - date.minute + 60) % 60}分",
+            cos((target_degree - 90) / 180 * pi) * CLOCK_RADIUS * 0.65 + CENTER,
+            sin((target_degree - 90) / 180 * pi) * CLOCK_RADIUS * 0.65 + CENTER,
+        ).font("", 24).fill(TIMER_COLOR)
     elif timer_value is not None:
         target_degree = int(timer_value / 60 * 360)
 
