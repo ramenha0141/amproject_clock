@@ -18,7 +18,7 @@ from citam_pydraw import (
     keyPressed,
     mousePressed,
 )
-from math import atan2, pi, sin, cos
+from math import atan2, pi, sin, cos, hypot, radians
 
 CLOCK_RADIUS = 300
 CLOCK_SIZE = CLOCK_RADIUS * 2
@@ -61,6 +61,47 @@ TIMER_COLOR = "#FF0000"
 TIMER_BACKGROUND_COLOR_SETTING = "#FFCCCC"
 TIMER_BACKGROUND_COLOR_SET = "#CCCCFF"
 
+BALL_SIZE = int(CLOCK_SIZE * 0.025)
+BALL_SPEED = 2
+BALL_COLOR = "#111111"
+
+# パドル(弧): 軸周りのレール上をマウス角度で公転。面は外向き。
+PADDLE_RADIUS = CLOCK_RADIUS * 0.2
+PADDLE_HALF_DEG = 33
+PADDLE_THICKNESS = 12
+PADDLE_COLOR = "#1E7A1E"
+PADDLE_MAX_DEFLECT_DEG = 60  # パドル端に当てた時の最大偏向角(度)
+
+WALL_RADIUS = CLOCK_RADIUS - BALL_SIZE / 2
+
+# ブロック: 同心3重リング（各リング同数＝外側ほど弧が幅広）／弧で描画
+BLOCK_RING_FACTORS = [0.55, 0.70, 0.85]
+BLOCK_COUNT_PER_RING = 12
+BLOCK_THICKNESS = 24
+BLOCK_ANGLE_FILL = 0.82
+BLOCK_HALF_DEG = (360 / BLOCK_COUNT_PER_RING) / 2 * BLOCK_ANGLE_FILL
+
+BLOCKS = []  # 各要素: (r, bcx, bcy, half_ang_rad, tk_start, tk_extent)
+for ring_radius_factor in BLOCK_RING_FACTORS:
+    ring_radius = CLOCK_RADIUS * ring_radius_factor
+    for k in range(BLOCK_COUNT_PER_RING):
+        center_degree = k * (360 / BLOCK_COUNT_PER_RING)
+        rad = radians(center_degree)
+        bcx, bcy = sin(rad), -cos(rad)
+        tk_center = 90 - center_degree
+        BLOCKS.append(
+            (
+                ring_radius,
+                bcx,
+                bcy,
+                radians(BLOCK_HALF_DEG),
+                tk_center - BLOCK_HALF_DEG,
+                2 * BLOCK_HALF_DEG,
+            )
+        )
+BLOCK_COUNT = len(BLOCKS)
+ALL_BLOCKS_MASK = (1 << BLOCK_COUNT) - 1
+
 
 def mouse_pos_to_minute():
     return int(30 - atan2(mouse.X - CENTER, mouse.Y - CENTER) / pi * 30 + 0.5)
@@ -79,6 +120,7 @@ def draw():
     draw_timer()
     draw_hands()
     draw_scales()
+    draw_block()
 
 
 @keyPressed
@@ -86,15 +128,21 @@ def key_pressed():
     global current_mode, timer_value, gaming_mode
 
     if keyboard.key == "t":
-        if current_mode == "normal":
+        if current_mode == "set_timer":
+            current_mode = "normal"
+        else:
             if timer_value is not None:
                 timer_value = None
             else:
                 current_mode = "set_timer"
-        elif current_mode == "set_timer":
-            current_mode = "normal"
     elif keyboard.key == "g":
         gaming_mode = not gaming_mode
+    elif keyboard.key == "b":
+        if current_mode == "block":
+            current_mode = "normal"
+        else:
+            current_mode = "block"
+            reset_block()
 
 
 @mousePressed
@@ -213,6 +261,118 @@ def draw_timer():
             cos((target_degree - 90) / 180 * pi) * CLOCK_RADIUS * 0.65 + CENTER,
             sin((target_degree - 90) / 180 * pi) * CLOCK_RADIUS * 0.65 + CENTER,
         ).font("", 24).fill(TIMER_COLOR)
+
+
+def reset_block():
+    global ball_x, ball_y, ball_vx, ball_vy, block_state
+
+    ball_x = CENTER
+    ball_y = CENTER
+    launch_degree = 30  # 時計規約(0 = 真上)
+    ball_vx = sin(radians(launch_degree)) * BALL_SPEED
+    ball_vy = -cos(radians(launch_degree)) * BALL_SPEED
+    block_state = 0
+
+
+def draw_block():
+    global ball_x, ball_y, ball_vx, ball_vy, block_state
+
+    if current_mode != "block":
+        return
+
+    # (A) ボールの位置更新
+    ball_x += ball_vx
+    ball_y += ball_vy
+
+    # (B) 外周の壁で反射
+    dx, dy = ball_x - CENTER, ball_y - CENTER
+    dist = hypot(dx, dy)
+    if dist > WALL_RADIUS and dist > 0:
+        nx, ny = dx / dist, dy / dist
+        dot = ball_vx * nx + ball_vy * ny
+        if dot > 0:
+            ball_vx -= 2 * dot * nx
+            ball_vy -= 2 * dot * ny
+        ball_x = CENTER + nx * WALL_RADIUS
+        ball_y = CENTER + ny * WALL_RADIUS
+
+    # (C) ブロックとの当たり判定・破壊(極座標/弧)
+    dx, dy = ball_x - CENTER, ball_y - CENTER
+    dist = hypot(dx, dy)
+    if dist > 0:
+        bux, buy = dx / dist, dy / dist  # ボールの半径方向単位ベクトル
+        for i in range(BLOCK_COUNT):
+            if block_state & (1 << i):
+                continue
+            r, bcx, bcy, half_ang, _, _ = BLOCKS[i]
+            ang = atan2(bcx * buy - bcy * bux, bcx * bux + bcy * buy)
+            pen_r = (BLOCK_THICKNESS / 2 + BALL_SIZE / 2) - abs(dist - r)
+            pen_t = (half_ang * r + BALL_SIZE / 2) - abs(ang) * r
+            if pen_r > 0 and pen_t > 0:
+                block_state |= 1 << i
+                if pen_r <= pen_t:
+                    sign = 1 if dist >= r else -1
+                    nx, ny, pen = bux * sign, buy * sign, pen_r
+                else:
+                    sign = 1 if ang >= 0 else -1
+                    nx, ny, pen = -buy * sign, bux * sign, pen_t
+                dot = ball_vx * nx + ball_vy * ny
+                if dot < 0:
+                    ball_vx -= 2 * dot * nx
+                    ball_vy -= 2 * dot * ny
+                ball_x += nx * pen
+                ball_y += ny * pen
+                break
+
+    # (D) 全ブロック破壊なら再出現(エンドレス)
+    if block_state == ALL_BLOCKS_MASK:
+        block_state = 0
+
+    # (E) 弧パドル(軸周りを公転)で反射 — 当たり位置に応じて反射角を変える
+    mouse_degree = mouse_pos_to_minute() * 6
+    prad = radians(mouse_degree)
+    pdx, pdy = sin(prad), -cos(prad)  # パドル中心の半径方向(外向き)
+    dx, dy = ball_x - CENTER, ball_y - CENTER
+    dist = hypot(dx, dy)
+    if dist > 0:
+        bux, buy = dx / dist, dy / dist  # ボールの半径方向(外向き)
+        band = BALL_SIZE / 2 + PADDLE_THICKNESS / 2
+        half_rad = radians(PADDLE_HALF_DEG)
+        ang = atan2(pdx * buy - pdy * bux, pdx * bux + pdy * buy)
+        if abs(dist - PADDLE_RADIUS) < band and abs(ang) < half_rad:
+            dot = ball_vx * bux + ball_vy * buy
+            if dot < 0:
+                speed = hypot(ball_vx, ball_vy)
+                deflect = (ang / half_rad) * radians(PADDLE_MAX_DEFLECT_DEG)
+                nx = bux * cos(deflect) - buy * sin(deflect)
+                ny = bux * sin(deflect) + buy * cos(deflect)
+                ball_vx = nx * speed
+                ball_vy = ny * speed
+            ball_x = CENTER + bux * (PADDLE_RADIUS + band)
+            ball_y = CENTER + buy * (PADDLE_RADIUS + band)
+
+    # (F) 描画
+    for i in range(BLOCK_COUNT):
+        if block_state & (1 << i):
+            continue
+        r, _, _, _, tk_start, tk_extent = BLOCKS[i]
+        Arc(CENTER, CENTER, r * 2, r * 2, tk_start, tk_extent).outlineStyle(
+            "arc"
+        ).outlineWidth(BLOCK_THICKNESS).outlineFill(
+            color(int(i / BLOCK_COUNT * 100), 80, 90)
+        )
+
+    tk_center = 90 - mouse_degree
+    Arc(
+        CENTER,
+        CENTER,
+        PADDLE_RADIUS * 2,
+        PADDLE_RADIUS * 2,
+        tk_center - PADDLE_HALF_DEG,
+        2 * PADDLE_HALF_DEG,
+    ).outlineStyle("arc").outlineWidth(PADDLE_THICKNESS).outlineFill(PADDLE_COLOR)
+
+    Ellipse(ball_x, ball_y, BALL_SIZE, BALL_SIZE).fill(BALL_COLOR)
 
 
 if __name__ == "__main__":
