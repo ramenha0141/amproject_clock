@@ -133,7 +133,15 @@ def draw():
 
 @keyPressed
 def key_pressed():
-    global current_mode, timer_value, gaming_mode, alarm_mode, alarm_start, gacha_n, gacha_m, gacha_result_prob
+    global \
+        current_mode, \
+        timer_value, \
+        gaming_mode, \
+        alarm_mode, \
+        alarm_start, \
+        gacha_n, \
+        gacha_m, \
+        gacha_result_prob
 
     if keyboard.key == "t":
         if current_mode == "set_timer":
@@ -276,7 +284,7 @@ def draw_timer():
     current_degree = int((date.minute + date.second / 60) / 60 * 360)
 
     if current_mode == "set_timer":
-        target_minute = mouse_pos_to_minute()
+        target_minute = int(mouse_pos_to_minute())
         target_degree = target_minute * 6
 
         Arc(
@@ -422,6 +430,7 @@ def draw_block():
     ).outlineStyle("arc").outlineWidth(PADDLE_THICKNESS).outlineFill(PADDLE_COLOR)
 
     Ellipse(ball_x, ball_y, BALL_SIZE, BALL_SIZE).fill(BALL_COLOR)
+
 
 def draw_alarm():
     global alarm_set, alarm_start
