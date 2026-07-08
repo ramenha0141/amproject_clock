@@ -61,9 +61,12 @@ TIMER_COLOR = "#FF0000"
 TIMER_BACKGROUND_COLOR_SETTING = "#FFCCCC"
 TIMER_BACKGROUND_COLOR_SET = "#CCCCFF"
 
+# ガチャモード用の色定義
+GACHA_TEXT_COLOR = "#FF0000"
+
 
 def mouse_pos_to_minute():
-    return int(30 - atan2(mouse.X - CENTER, mouse.Y - CENTER) / pi * 30 + 0.5)
+    return (30 - atan2(mouse.X - CENTER, mouse.Y - CENTER) / pi * 30) % 60
 
 
 @animation(True)
@@ -79,11 +82,12 @@ def draw():
     draw_timer()
     draw_hands()
     draw_scales()
+    draw_gacha_interface()  # ガチャ機能の描画処理
 
 
 @keyPressed
 def key_pressed():
-    global current_mode, timer_value, gaming_mode
+    global current_mode, timer_value, gaming_mode, gacha_n, gacha_m, gacha_result_prob
 
     if keyboard.key == "t":
         if current_mode == "normal":
@@ -96,14 +100,52 @@ def key_pressed():
     elif keyboard.key == "g":
         gaming_mode = not gaming_mode
 
+    # 「k」キーでのガチャモード切り替え・解除
+    elif keyboard.key == "k":
+        # ガチャモードのどの状態(選択中・結果表示中)であっても通常に戻す
+        if current_mode in ["gacha_n", "gacha_m", "gacha_result"]:
+            current_mode = "normal"
+            gacha_n = None
+            gacha_m = None
+            gacha_result_prob = None
+        else:
+            # 通常モードから新しくガチャモードを開始
+            current_mode = "gacha_n"
+            gacha_n = None
+            gacha_m = None
+            gacha_result_prob = None
+
 
 @mousePressed
 def mouse_pressed():
-    global current_mode, timer_value
+    global current_mode, timer_value, gacha_n, gacha_m, gacha_result_prob
 
-    if mouse.pressButton == "left" and current_mode == "set_timer":
-        current_mode = "normal"
-        timer_value = mouse_pos_to_minute()
+    if mouse.pressButton == "left":
+        if current_mode == "set_timer":
+            current_mode = "normal"
+            timer_value = int(mouse_pos_to_minute() + 0.5) % 60
+
+        # 確率 n の決定
+        elif current_mode == "gacha_n":
+            raw_min = mouse_pos_to_minute()
+            if raw_min > 59.9:
+                raw_min = 59.9
+            gacha_n = round(raw_min * 0.1, 2)
+            current_mode = "gacha_m"  # 続けてmの選択（連動プレビュー）モードへ
+
+        # 回数 m の決定と結果の確定
+        elif current_mode == "gacha_m":
+            raw_min = mouse_pos_to_minute()
+            if raw_min > 59.5:
+                raw_min = 59.5
+            gacha_m = int(raw_min * 2)
+            current_mode = "gacha_result"  # 結果確定画面モードへ
+
+            # 確定時の確率計算
+            if gacha_n > 0 and gacha_m > 0:
+                gacha_result_prob = 1 - (1 - gacha_n / 100) ** gacha_m
+            else:
+                gacha_result_prob = 0.0
 
 
 def lerp_color(c1, c2, t):
@@ -215,6 +257,55 @@ def draw_timer():
         ).font("", 24).fill(TIMER_COLOR)
 
 
+def draw_gacha_interface():
+    current_mouse_min = mouse_pos_to_minute()
+
+    str_n = "n"
+    str_m = "m"
+    prob_to_display = None  # 画面に表示する当たる確率のパーセンテージ
+
+    # 1. 確率nの選択中
+    if current_mode == "gacha_n":
+        preview_min = current_mouse_min if current_mouse_min <= 59.9 else 59.9
+        str_n = f"{round(preview_min * 0.1, 2):.2f}"
+
+    # 2. 回数mの選択中（ここを「同時に出て連動して動く」ように大改造しました）
+    elif current_mode == "gacha_m":
+        str_n = f"{gacha_n:.2f}"
+
+        # マウスの位置からリアルタイムに回数「m」を計算
+        preview_min = current_mouse_min if current_mouse_min <= 59.5 else 59.5
+        current_m = int(preview_min * 2)
+        str_m = f"{current_m}"
+
+        # 【重要】クリック前でも、マウスの回数変化に連動して確率をリアルタイム計算する
+        if gacha_n > 0 and current_m > 0:
+            prob_to_display = (1 - (1 - gacha_n / 100) ** current_m) * 100
+        else:
+            prob_to_display = 0.0
+
+    # 3. クリックして結果が確定した後（gacha_result）
+    elif current_mode == "gacha_result":
+        str_n = f"{gacha_n:.2f}"
+        str_m = f"{gacha_m}"
+        if gacha_result_prob is not None:
+            prob_to_display = gacha_result_prob * 100
+
+    # ガチャモード稼働中なら、いつでも「n％の確率を m回する」をリアルタイム描写
+    if current_mode in ["gacha_n", "gacha_m", "gacha_result"]:
+        display_text = f"{str_n}％の確率を {str_m}回する"
+        Text(display_text, CENTER + 15, CENTER).font("", FONT_SIZE).fill(
+            GACHA_TEXT_COLOR
+        )
+
+    # 回数選択中（連動中）、または結果確定後のどちらでも下の行に「当たる確率」を数字で出す
+    if prob_to_display is not None:
+        result_text = f"当たる確率: {round(prob_to_display, 2):.2f}%"
+        Text(result_text, CENTER + 60, CENTER + FONT_SIZE + 10).font(
+            "", FONT_SIZE
+        ).fill(GACHA_TEXT_COLOR)
+
+
 if __name__ == "__main__":
     window = (
         Window(WINDOW_SIZE, WINDOW_SIZE)
@@ -233,6 +324,10 @@ if __name__ == "__main__":
     timer_value = None
     gaming_mode = False
     count = 0
+
+    gacha_n = None
+    gacha_m = None
+    gacha_result_prob = None
 
     draw()
     window.show()
