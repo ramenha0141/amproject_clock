@@ -39,6 +39,9 @@ DIAL_LOCATION = SCALE_START + (CENTER - SCALE_START) / 6
 
 CLOCK_COLOR = "#FFFFFF"
 
+ALARM_INTERVAL = 25
+ALARM_COLOR = "#37B92E"
+
 # 時刻(時)ごとの空の色 (Minecraftの昼夜サイクルを参考)。
 # 末尾の 24.0 は先頭 0.0 と同色にしてループを滑らかにつなぐ。
 SKY_KEYFRAMES = [
@@ -121,11 +124,12 @@ def draw():
     draw_hands()
     draw_scales()
     draw_block()
+    draw_alarm()
 
 
 @keyPressed
 def key_pressed():
-    global current_mode, timer_value, gaming_mode
+    global current_mode, timer_value, gaming_mode, alarm_mode, alarm_start
 
     if keyboard.key == "t":
         if current_mode == "set_timer":
@@ -143,6 +147,9 @@ def key_pressed():
         else:
             current_mode = "block"
             reset_block()
+    elif keyboard.key == "a":
+        alarm_mode = not alarm_mode
+        alarm_start = date.minute
 
 
 @mousePressed
@@ -193,7 +200,7 @@ def draw_dials():
 
 
 def draw_scales():
-    for i in range(1, 61):
+    for i in range(0, 60):
         if (i % 5) == 0:
             scale = Line(CENTER, SCALE_START, CENTER, SCALE_END * 1.1, 2)
         else:
@@ -374,6 +381,21 @@ def draw_block():
 
     Ellipse(ball_x, ball_y, BALL_SIZE, BALL_SIZE).fill(BALL_COLOR)
 
+def draw_alarm():
+    global alarm_set, alarm_start
+    if alarm_mode:
+        alarm_set = (alarm_start + ALARM_INTERVAL) % 60
+        scale = (
+            Line(CENTER, SCALE_START, CENTER, SCALE_END * 1.2, 2)
+            .fill(ALARM_COLOR)
+            .lineWeight(5)
+        )
+        scale.setRotationCenter(CENTER, CENTER)
+        scale.rotate(int((360 / 60) * alarm_set))
+        if date.minute == alarm_set:
+            alarm_sound.play()
+            alarm_start = alarm_set
+
 
 if __name__ == "__main__":
     window = (
@@ -388,10 +410,14 @@ if __name__ == "__main__":
     keyboard = KeyBoard()
     mouse = Mouse()
     timer_sound = Music("./timer.mp3")
+    alarm_sound = Music("./timer.mp3")
 
     current_mode = "normal"
     timer_value = None
     gaming_mode = False
+    alarm_mode = False
+    alarm_start = 0
+    alarm_set = 0
     count = 0
 
     draw()
